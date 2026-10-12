@@ -449,12 +449,33 @@ def fleet_astar(problem, heuristic_variant=1, max_expansions=10000):
             remaining=len(ids)-len(frozenset().union(*(s.delivered for s in new_states)))
             # h1: 0 é admissível mas pouco informativa; h2: distância mínima 
             # a uma operação possível (não garantidamente admissível).
-            h=0.0
-            if heuristic_variant==2 and remaining:
-                opts=list(_fleet_candidates(problem,new_states,ids-frozenset().union(*(s.delivered for s in new_states))))
-                h=min((x[2] for x in opts),default=0.)
-            elif heuristic_variant!=1:
-                raise ValueError("heuristic_variant deve ser 1 ou 2")
+           
+            h = 0.0
+
+            if heuristic_variant == 2:
+                if remaining > 0:
+                    pendentes = ids - frozenset().union(
+                        *(s.delivered for s in new_states)
+                    )
+
+                    opts = list(
+                        _fleet_candidates(
+                            problem,
+                            new_states,
+                            pendentes
+                        )
+                    )
+
+                    h = min(
+                        (x[2] for x in opts),
+                        default=0.0
+                    )
+
+            elif heuristic_variant != 1:
+                raise ValueError(
+                    "heuristic_variant deve ser 1 ou 2"
+                )
+
             heapq.heappush(queue,(cost+h,next(counter),new_states))
     delivered=frozenset().union(*(s.delivered for s in best_partial))
     result=_fleet_complete(problem,best_partial,len(delivered),expanded,start,"fleet_astar",
