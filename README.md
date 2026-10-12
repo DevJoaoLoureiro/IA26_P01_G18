@@ -42,7 +42,6 @@ RELATÓRIO:
 https://colab.research.google.com/drive/1weJqQm-Yb1vAAoeTRzOOaSqEdxYfGAa-
 
 NOTAS:
-- O repositório é privado e deve estar acessível ao docente.
 - O dataset utilizado é o data_tiny.
 - Os algoritmos de pesquisa utilizam limites computacionais.
 - Não é garantida a otimalidade global das soluções obtidas.
