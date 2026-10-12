@@ -212,6 +212,8 @@ def greedy(problem, heuristic_variant=1, max_expansions=50000):
     return search(problem,"greedy",heuristic_variant,max_expansions)
 
 
+
+
 def astar(problem, heuristic_variant=1, max_expansions=50000):
     return search(problem,"astar",heuristic_variant,max_expansions)
 
@@ -417,6 +419,79 @@ def fleet_greedy(problem, heuristic_variant=1, max_steps=10000):
         states = tuple(nxt if j==vi else s for j,s in enumerate(states))
     delivered = set().union(*(s.delivered for s in states))
     return _fleet_complete(problem,states,len(delivered),expanded,start,"fleet_greedy","Limite de passos")
+
+
+def fleet_gbfs(problem, heuristic_variant=1, max_expansions=5000):
+    """Greedy Best-First Search para a frota, com fronteira de prioridades.
+
+    A fronteira é ordenada APENAS por h(n), sem incluir g(n):
+      H1: menor distância para a próxima operação viável (km);
+      H2: menor folga temporal para a próxima operação viável (minutos).
+    A função procura uma solução completa; pode atingir o limite de expansões.
+    Nem H1 nem H2 garantem a menor distância global.
+    """
+    if heuristic_variant not in (1, 2):
+        raise ValueError("heuristic_variant deve ser 1 ou 2")
+    if max_expansions < 1:
+        raise ValueError("max_expansions deve ser positivo")
+
+    start = time.perf_counter()
+    ids = frozenset(r.item_id for r in problem.requests)
+    by_id = {r.item_id: r for r in problem.requests}
+    root = tuple(State(v.center_location, problem.start_time)
+                 for v in problem.vehicles)
+
+    def delivered_ids(states):
+        return frozenset().union(*(s.delivered for s in states))
+
+    def h(states):
+        pending = ids - delivered_ids(states)
+        if not pending:
+            return 0.0
+        candidates = list(_fleet_candidates(problem, states, pending))
+        if not candidates:
+            return math.inf
+        if heuristic_variant == 1:
+            return min(km for _, _, km, _, _ in candidates)
+        return min(
+            ((by_id[item].pickup_end if kind == 'recolha'
+              else by_id[item].delivery_end) - nxt.moment).total_seconds() / 60.0
+            for _, nxt, _, kind, item in candidates
+        )
+
+    counter = itertools.count()
+    frontier = [(h(root), next(counter), root)]
+    visited = set()
+    expanded = 0
+    best_partial = root
+
+    while frontier and expanded < max_expansions:
+        _, _, states = heapq.heappop(frontier)
+        completed = delivered_ids(states)
+        if len(completed) > len(delivered_ids(best_partial)):
+            best_partial = states
+        if completed == ids:
+            return _fleet_complete(problem, states, len(completed),
+                                   expanded, start, "fleet_gbfs")
+        key = tuple((s.location, s.picked, s.delivered,
+                     round(s.load, 5), s.moment) for s in states)
+        if key in visited:
+            continue
+        visited.add(key)
+        expanded += 1
+        for vi, nxt, _, _, _ in _fleet_candidates(problem, states, ids - completed):
+            successors = tuple(nxt if j == vi else s
+                               for j, s in enumerate(states))
+            heapq.heappush(frontier, (h(successors), next(counter), successors))
+
+    partial_count = len(delivered_ids(best_partial))
+    result = _fleet_complete(
+        problem, best_partial, partial_count, expanded, start, "fleet_gbfs",
+        "Pesquisa sem solução completa (limite de expansões ou fronteira esgotada)"
+    )
+    result.feasible = False
+    return result
+
 
 
 def fleet_astar(problem, heuristic_variant=1, max_expansions=10000):
